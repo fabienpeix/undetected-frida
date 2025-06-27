@@ -211,10 +211,18 @@ jobs:
       - name: Install dependencies
         run: |
           xcode-select --install || true
-          brew update && brew install automake llvm cmake ninja pkg-config python@3.12
+          brew update && brew install automake llvm gcc cmake ninja pkg-config python@3.12
           python3 -m venv venv
           source venv/bin/activate
           pip install -U setuptools lief
+
+      - name: Add llvm to PATH
+        run: echo 'export PATH="/usr/local/opt/llvm/bin:$PATH"' >> $GITHUB_ENV
+      
+      - name: Set CC and CXX
+        run: |
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
 
       - name: Clone Frida and prepare build
         run: |
