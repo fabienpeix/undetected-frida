@@ -2,7 +2,17 @@ name: Build undetected_frida for iOS & Android (arm64)
 
 on:
   workflow_dispatch:
-
+    inputs:
+      force:
+        description: 'Force rebuild and republish even if a release exists?'
+        required: false
+        default: 'false'
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main        
 jobs:
   check:
     runs-on: ubuntu-22.04
@@ -26,8 +36,23 @@ jobs:
   create:
     runs-on: ubuntu-22.04
     needs: [check]
-    if: needs.check.outputs.RELEASE_EXISTS == '0'
+    if: needs.check.outputs.RELEASE_EXISTS == '0' || github.event.inputs.force == 'true'
     steps:
+    - name: Delete existing release and tag if force is set
+      if: github.event.inputs.force == 'true'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        FRIDA_VERSION: ${{ needs.check.outputs.FRIDA_VERSION }}
+      run: |
+        # Install GitHub CLI if not present (macos-latest and ubuntu-22.04 usually have it)
+        if ! command -v gh &>/dev/null; then
+          sudo apt-get update && sudo apt-get install -y gh
+        fi
+        # Delete the release if it exists
+        gh release delete "$FRIDA_VERSION" -y || true
+        # Delete the tag if it exists
+        git push --delete origin "$FRIDA_VERSION" || true
+    
     - name: Create release
       id: create
       env:
@@ -49,7 +74,7 @@ jobs:
   build-android:
     runs-on: ubuntu-22.04
     needs: [check, create]
-    if: needs.check.outputs.RELEASE_EXISTS == '0'
+    if: needs.check.outputs.RELEASE_EXISTS == '0' || github.event.inputs.force == 'true'
     strategy:
       matrix:
         arch: [arm64]
@@ -175,7 +200,7 @@ jobs:
   build-ios:
     runs-on: macos-latest
     needs: [check, create]
-    if: needs.check.outputs.RELEASE_EXISTS == '0'
+    if: needs.check.outputs.RELEASE_EXISTS == '0' || github.event.inputs.force == 'true'
     strategy:
       matrix:
         arch: [arm64]
@@ -210,7 +235,7 @@ jobs:
   publish:
     runs-on: ubuntu-22.04
     needs: [check, create, build-android, build-ios]
-    if: needs.check.outputs.RELEASE_EXISTS == '0'
+    if: needs.check.outputs.RELEASE_EXISTS == '0' || github.event.inputs.force == 'true'
     steps:
     - uses: actions/checkout@v4
     - name: Pass artifacts for Magisk module
