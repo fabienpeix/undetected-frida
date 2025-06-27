@@ -273,4 +273,26 @@ jobs:
         gh_release_put "${OLDPWD}/magisk.zip" "${GITHUB_REPOSITORY##*/}-magisk-${FRIDA_VERSION}.zip"
         popd
 
+      - name: Download iOS artifacts
+            uses: actions/download-artifact@v4
+            with:
+              name: frida-ios-artifacts-arm64
+              path: ios-artifacts
+      
+          - name: Publish iOS artifacts to release
+            env:
+              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              FRIDA_VERSION: ${{ needs.check.outputs.FRIDA_VERSION }}
+            run: |
+              gh_release_put(){ 
+                curl -fs -H "Authorization: token ${GITHUB_TOKEN}" \
+                -H "Content-Type: application/octet-stream" \
+                -o /dev/null --data-binary "@${1}" \
+                "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/${{ needs.create.outputs.RELEASE_ID }}/assets?name=$(basename "${2:-$1}")"
+              }
+              # Upload all files from the iOS build output
+              find ios-artifacts -type f | while read f; do
+                gh_release_put "$f"
+              done
+
         echo '{"draft":false}' | curl -fs -H "Authorization: token ${GITHUB_TOKEN}" -H "Content-Type: application/json" -d@- -o /dev/null -XPATCH "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/${{ needs.create.outputs.RELEASE_ID }}"
