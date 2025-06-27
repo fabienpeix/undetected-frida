@@ -1,8 +1,6 @@
-name: undetected-frida
+name: Build undetected_frida for iOS & Android (arm64)
 
 on:
-  schedule:
-    - cron: "0 9/12 * * *"
   workflow_dispatch:
 
 jobs:
@@ -10,17 +8,17 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check for existing release
-          id: check
-          run: |
-            frida_version="$(curl -fs https://api.github.com/repos/frida/frida/releases | jq -r .[].tag_name | sort -nr | head -n1)"
-            frida_version="$(curl -fs https://api.github.com/repos/frida/frida/releases/latest | jq -r .tag_name)"
-            echo "FRIDA_VERSION=${frida_version}" >> "${GITHUB_OUTPUT}"  # gh env?
-    
-            release_exists=0
-            set +e
-            curl -fso /dev/null "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${frida_version}"
-            [ "${?}" -ne 0 ] || release_exists=1
-            echo "RELEASE_EXISTS=${release_exists}" >> "${GITHUB_OUTPUT}"
+      id: check
+      run: |
+        frida_version="$(curl -fs https://api.github.com/repos/frida/frida/releases | jq -r .[].tag_name | sort -nr | head -n1)"
+        frida_version="$(curl -fs https://api.github.com/repos/frida/frida/releases/latest | jq -r .tag_name)"
+        echo "FRIDA_VERSION=${frida_version}" >> "${GITHUB_OUTPUT}"  # gh env?
+
+        release_exists=0
+        set +e
+        curl -fso /dev/null "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${frida_version}"
+        [ "${?}" -ne 0 ] || release_exists=1
+        echo "RELEASE_EXISTS=${release_exists}" >> "${GITHUB_OUTPUT}"
     outputs:
       FRIDA_VERSION: ${{ steps.check.outputs.FRIDA_VERSION }}
       RELEASE_EXISTS: ${{ steps.check.outputs.RELEASE_EXISTS }}
@@ -31,20 +29,20 @@ jobs:
     if: needs.check.outputs.RELEASE_EXISTS == '0'
     steps:
     - name: Create release
-        id: create
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # might need to use bash arrays for adequate DRY quotation?
-          curl_args="-fs -H 'Authorization: token ${GITHUB_TOKEN}'"
-          api_args="${curl_args} -H 'Content-Type: application/json' -d@-"
-          upload_args="${curl_args} -H 'Content-Type: application/octet-stream' -o /dev/null --data-binary @-"  # cat | curl --data-binary
-    
-          tmpfile="$(mktemp)"  # a bit excessive, but eh
-          echo '{"tag_name":"${{ needs.check.outputs.FRIDA_VERSION }}","name":"${{ needs.check.outputs.FRIDA_VERSION }}","body":"${{ needs.check.outputs.FRIDA_VERSION }}","draft":true}' | curl -fs -H "Authorization: token ${GITHUB_TOKEN}" -H "Content-Type: application/json" -d@- "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases" >"${tmpfile}"
-    
-          echo "RELEASE_ID=$(jq -r .id "${tmpfile}")" >> "${GITHUB_OUTPUT}"
-          #echo "UPLOAD_URL=$(jq -r .upload_url "${tmpfile}")" >> "${GITHUB_OUTPUT}"
+      id: create
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # might need to use bash arrays for adequate DRY quotation?
+        curl_args="-fs -H 'Authorization: token ${GITHUB_TOKEN}'"
+        api_args="${curl_args} -H 'Content-Type: application/json' -d@-"
+        upload_args="${curl_args} -H 'Content-Type: application/octet-stream' -o /dev/null --data-binary @-"  # cat | curl --data-binary
+  
+        tmpfile="$(mktemp)"  # a bit excessive, but eh
+        echo '{"tag_name":"${{ needs.check.outputs.FRIDA_VERSION }}","name":"${{ needs.check.outputs.FRIDA_VERSION }}","body":"${{ needs.check.outputs.FRIDA_VERSION }}","draft":true}' | curl -fs -H "Authorization: token ${GITHUB_TOKEN}" -H "Content-Type: application/json" -d@- "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases" >"${tmpfile}"
+  
+        echo "RELEASE_ID=$(jq -r .id "${tmpfile}")" >> "${GITHUB_OUTPUT}"
+        #echo "UPLOAD_URL=$(jq -r .upload_url "${tmpfile}")" >> "${GITHUB_OUTPUT}"
     outputs:
       RELEASE_ID: ${{ steps.create.outputs.RELEASE_ID }}
 
@@ -273,26 +271,26 @@ jobs:
         gh_release_put "${OLDPWD}/magisk.zip" "${GITHUB_REPOSITORY##*/}-magisk-${FRIDA_VERSION}.zip"
         popd
 
-      - name: Download iOS artifacts
-            uses: actions/download-artifact@v4
-            with:
-              name: frida-ios-artifacts-arm64
-              path: ios-artifacts
-      
-          - name: Publish iOS artifacts to release
-            env:
-              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              FRIDA_VERSION: ${{ needs.check.outputs.FRIDA_VERSION }}
-            run: |
-              gh_release_put(){ 
-                curl -fs -H "Authorization: token ${GITHUB_TOKEN}" \
-                -H "Content-Type: application/octet-stream" \
-                -o /dev/null --data-binary "@${1}" \
-                "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/${{ needs.create.outputs.RELEASE_ID }}/assets?name=$(basename "${2:-$1}")"
-              }
-              # Upload all files from the iOS build output
-              find ios-artifacts -type f | while read f; do
-                gh_release_put "$f"
-              done
+    - name: Download iOS artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: frida-ios-artifacts-arm64
+        path: ios-artifacts
+
+    - name: Publish iOS artifacts to release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        FRIDA_VERSION: ${{ needs.check.outputs.FRIDA_VERSION }}
+      run: |
+        gh_release_put(){ 
+          curl -fs -H "Authorization: token ${GITHUB_TOKEN}" \
+          -H "Content-Type: application/octet-stream" \
+          -o /dev/null --data-binary "@${1}" \
+          "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/${{ needs.create.outputs.RELEASE_ID }}/assets?name=$(basename "${2:-$1}")"
+        }
+        # Upload all files from the iOS build output
+        find ios-artifacts -type f | while read f; do
+          gh_release_put "$f"
+        done
 
         echo '{"draft":false}' | curl -fs -H "Authorization: token ${GITHUB_TOKEN}" -H "Content-Type: application/json" -d@- -o /dev/null -XPATCH "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/${{ needs.create.outputs.RELEASE_ID }}"
