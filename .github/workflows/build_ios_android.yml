@@ -219,7 +219,9 @@ jobs:
         run: |
           git clone --recurse-submodules https://github.com/frida/frida -b "${{ needs.check.outputs.FRIDA_VERSION }}"
           cd frida
+          python3 -m venv venv
           source venv/bin/activate
+          pip install -U setuptools lief
           # Build the SDK from source if prebuilt is missing
           python3 ./releng/deps.py build --bundle=sdk --host=apple-arm64
 
