@@ -216,6 +216,15 @@ jobs:
           source venv/bin/activate
           pip install -U setuptools lief
 
+      - name: Install OpenSSL (Homebrew)
+        run: brew install openssl@3
+
+      - name: Set OpenSSL env vars
+        run: |
+          echo 'export PKG_CONFIG_PATH="/opt/homebrew/opt/openssl@3/lib/pkgconfig:$PKG_CONFIG_PATH"' >> $GITHUB_ENV
+          echo 'export LDFLAGS="-L/opt/homebrew/opt/openssl@3/lib $LDFLAGS"' >> $GITHUB_ENV
+          echo 'export CPPFLAGS="-I/opt/homebrew/opt/openssl@3/include $CPPFLAGS"' >> $GITHUB_ENV
+    
       - name: Add llvm to PATH
         run: echo 'export PATH="/usr/local/opt/llvm/bin:$PATH"' >> $GITHUB_ENV
       
