@@ -215,13 +215,22 @@ jobs:
           source venv/bin/activate
           pip install -U setuptools lief
 
+      - name: Clone Frida and prepare build
+        run: |
+          git clone --recurse-submodules https://github.com/frida/frida -b "${{ needs.check.outputs.FRIDA_VERSION }}"
+          cd frida
+          source venv/bin/activate
+          # Build the SDK from source if prebuilt is missing
+          python3 ./releng/deps.py build --bundle=sdk --host=apple-arm64
+
       - name: Build Frida for iOS
         run: |
           FRIDA_VERSION="${{ needs.check.outputs.FRIDA_VERSION }}"
           git clone --recurse-submodules https://github.com/frida/frida -b "${FRIDA_VERSION}"
           cd frida
+          source venv/bin/activate
           # Minimal iOS build example — adjust for your real needs:
-          ./configure --prefix="${PWD}/build" --host=arm64-apple-ios --enable-frida-tools --enable-gadget --enable-server --enable-portal
+          ./configure --prefix="${PWD}/build" --host=arm64-apple-ios --enable-frida-tools --enable-gadget --enable-server --enable-portal --without-prebuilds=sdk:host
           make
 
       - name: Upload iOS artifacts
