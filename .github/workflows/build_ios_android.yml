@@ -213,7 +213,7 @@ jobs:
           brew install automake cmake ninja pkg-config python@3.12
           python3 -m venv venv
           source venv/bin/activate
-          python3.12 -m pip install -U setuptools lief
+          pip install -U setuptools lief
 
       - name: Build Frida for iOS
         run: |
